@@ -129,6 +129,7 @@ class Hardware:
         if is_fake:  # use a fake backend for testing
             self.backend = FakeManilaV2()
         else:  # use a real backend (QPU)
+            # self.backend = self.service.backend(name="ibm_strasbourg")
             self.backend = self.service.least_busy()
         print("backend set to : ", self.backend)
 
@@ -189,8 +190,15 @@ class Hardware:
             list or str: Measurement results if successful; error message otherwise.
         """
         status = self.get_job_status(id)
+        
         if status == "CANCELLED" or status == "ERROR":
-            return f"No results for job : {id}, reason : job {status}"
+            print( f"No results for job : {id}, reason : job {status}")
+            
+            job=self.service.job(id)
+            nbits=job.inputs['pubs'][0][0].num_clbits
+            npub=len(job.inputs['pubs'])
+            print(f"return : {"0"*nbits} for {npub} pub ")
+            return ["0"*nbits for _ in range(npub)]
         t = time.time()
         while status != "DONE":
             print(
@@ -204,7 +212,7 @@ class Hardware:
             if (time.time() - t) / 60 > 30:
                 print("Waiting time over 30 min, try later, status : ", status)
                 return None
-        print("Job finish, status :", status,
+        print(f"Job {id}, status :", status,
               "Total waiting time : ", time.time() - t)
         return self.get_data_from_results(self.get_job_result(id))
 

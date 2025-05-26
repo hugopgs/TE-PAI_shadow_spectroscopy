@@ -135,3 +135,6 @@ Hardware_simulation/2025*
 qiskit_runtime.json
 test_tmp/
 
+get_overhead.py
+test_shot TE-PAI.py
+/main_noisy.py

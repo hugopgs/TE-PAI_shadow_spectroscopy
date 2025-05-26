@@ -282,6 +282,52 @@ def generate_qasm_from_gates(gates, num_qubits):
 
     return qasm
 
+import re
+
+def get_depth_from_qasm(qasm_str: str) -> int:
+    """
+    Compute the circuit depth from a QASM string using only rx, rz, rxx, ryy, rzz gates.
+
+    Args:
+        qasm_str (str): The QASM string.
+
+    Returns:
+        int: The circuit depth.
+    """
+    if isinstance(qasm_str, list):
+        depth_list = []
+        for i in range(len(qasm_str)):
+            depth_list.append(get_depth_from_qasm(qasm_str[i]))
+        return np.mean(depth_list)
+    # Match the qreg definition
+    qreg_match = re.search(r"qreg\s+(\w+)\[(\d+)\];", qasm_str)
+    if not qreg_match:
+        raise ValueError("No qreg declaration found.")
+
+    prefix, size = qreg_match.group(1), int(qreg_match.group(2))
+    qubit_depths = [0] * size
+    max_depth = 0
+
+    # Only consider these gates
+    gate_pattern = re.compile(
+        r"(rx|rz|rxx|ryy|rzz)\s*\([^)]*\)\s+([a-zA-Z_]+\[\d+\](?:\s*,\s*[a-zA-Z_]+\[\d+\])?)\s*;",
+        re.IGNORECASE
+    )
+
+    for match in gate_pattern.finditer(qasm_str):
+        gate = match.group(1).lower()
+        qubit_args = match.group(2).replace(" ", "")
+        qubits = [int(q.split('[')[1][:-1]) for q in qubit_args.split(",")]
+
+        current_layer = max(qubit_depths[q] for q in qubits) + 1
+
+        for q in qubits:
+            qubit_depths[q] = current_layer
+
+        max_depth = max(max_depth, current_layer)
+
+    return max_depth
+
 
 def qiskit_get_last_single_qubit_gates(circuit: QuantumCircuit):
     last_single_qubit_gate_indices = [-1] * circuit.num_qubits

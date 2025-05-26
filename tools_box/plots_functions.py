@@ -145,13 +145,15 @@ def plot_spectre(frequencies: np.ndarray, values: np.ndarray, Energy_gap: list[f
 def plot_multiple_data(X_list: list[list], Y_list: list[list],
                        labels: list[str], x_label: str = "Frequency",
                        y_label: str = "Amplitude,\n Arbitrary units", title: str = "Spectral cross correlation",
+                       color: list =["red","green","blue"],
+                       linestyle: list =  ['-','-', '-'],
                        Energy_gap: list = [],
                        save_as: str = None, Folder: str = "Data"):
-    color=["red", "blue","green"]
+
     freq_max = []
     plt.figure(figsize=(10, 6))
     for i in range(len(X_list)):
-        plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i])
+        plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i], linestyle=linestyle[i])
         pos_max = np.argsort(np.abs(Y_list[i]))[::-1]
         freq_max.append(X_list[i][pos_max[:len(Energy_gap)]])
         print(freq_max)
@@ -169,13 +171,44 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
 
     plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
     # 'both' applies to x and y axis
-    plt.tick_params(axis='both', labelsize=14)
+    plt.tick_params(axis='both', labelsize=tick_labelsize)
     plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
-    plt.title(title, fontsize=14, fontweight='bold')
-    plt.xlabel(x_label, fontsize=12)
-    plt.ylabel(y_label, fontsize=12)
+    plt.title(title, fontsize=Title_fontsize, fontweight='bold')
+    plt.xlabel(x_label, fontsize=Label_fontsize)
+    plt.ylabel(y_label, fontsize=Label_fontsize)
     plt.legend(fontsize=10, loc="best")
 
     # Save the plot if save_as is provided
     if isinstance(save_as, str):
         save_fig(save_as, Folder)
+
+
+def plot_semi_log_data(x: np.ndarray, y: np.ndarray, linthresh : float=1e-3,
+            title: str = "Semi-log plot", x_label: str = "x", y_label: str = "y",scatter: bool = False,
+            save_as: str = None, Folder: str = "Data") -> None:
+    
+    plt.figure(figsize=(8, 5))
+    if scatter:
+        plt.scatter(x, y, color='blue')
+    else:
+        plt.plot(x, y, color='blue')
+        
+    plt.yscale('symlog', linthresh=1e-3)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
+    
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
+    # 'both' applies to x and y axis
+    plt.tick_params(axis='both', labelsize=tick_labelsize)
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
+    plt.title(title, fontsize=Title_fontsize, fontweight='bold')
+    plt.xlabel(x_label, fontsize=Label_fontsize)
+    plt.ylabel(y_label, fontsize=Label_fontsize)
+    plt.legend(fontsize=10, loc="best")
+
+    # Save the plot if save_as is provided
+    if isinstance(save_as, str):
+        save_fig(save_as, Folder)
+

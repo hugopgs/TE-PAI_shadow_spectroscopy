@@ -1,4 +1,5 @@
 # Third-party imports
+from itertools import product
 import numpy as np
 
 # Local application imports
@@ -12,34 +13,33 @@ from Hamiltonian.Hamiltonian import Hamiltonian
 from tools_box.quantum_tools import *
 
 
-numQs = 25
+numQs = 10
+
+def J(t):
+    return 1
 
 
-def J(_):
-    return -1 * 0.1
+terms = [
+    (gate, [k, k + 1], J if gate ==
+        "XX" else J if gate == "YY" else J)
+    for k, gate in product(range(numQs-1), ["XX", "YY", "ZZ"])
+    ]
 
-
-def h(_):
-    return -1 * 1
-
-
-terms = [("ZZ", [k, (k + 1) % numQs], J) for k in range(numQs)]
-terms += [("X", [k], h) for k in range(numQs)]
 
 
 if __name__ == "__main__":
     # # Parameters :
     k: int = 3  # K Pauli observable
     # shadow_size: int = 35  # Shadow size
-    shadow_size: int = 3 # Shadow size
-    Nt: int = 150  # Number of time steps
+    shadow_size: int =  5 # Shadow size
+    Nt: int = 130 # Number of time steps
     delta: float = np.pi / 2**7 # Trotter Delta
-    dt: float = 10/Nt  # Time step
+    dt: float = 11/Nt  # Time step
 
     # Hamiltonian:
     hamil = Hamiltonian(numQs, terms)
-    Initial_state = QuantumCircuit(numQs)
-    Initial_state.h(i for i in range(numQs))
+    ground_energy, first_excited_energy, ground_components, excited_components =  hamil.get_ground_and_excited_state()
+    Initial_state = ground_components + excited_components
 
     # Creation Shadow spectro
     shadow = ClassicalShadow()
@@ -54,8 +54,8 @@ if __name__ == "__main__":
         K=k,
         trotter_steps=0.012,
         N_trotter_max=900,
-        M_sample_max=400,
-        PAI_error=0.09,
+        M_sample_max=500,
+        PAI_error=0.1,
         init_state=Initial_state,
     )
 
@@ -65,10 +65,11 @@ if __name__ == "__main__":
     # is_save = True
 
     # from the second time
+    # token = "your API token"
     token = None
     is_save = False
 
-    hardware = Hardware(is_fake=False)
+    hardware = Hardware(token, is_fake=False)
     # is_fake=False: QPU
     # -------- Hardware settings --------
 

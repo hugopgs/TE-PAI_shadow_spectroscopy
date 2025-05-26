@@ -360,6 +360,7 @@ class TE_PAI_Shadow_Spectro_Hardware:
         is_density_matrix: bool = True,
         is_verbose: bool = False,
         res_fake_backend=None,
+        Folder_path="data/Hardware_simulation/",
     ):
         Measurement_bit_string = []
         if res_fake_backend is not None:
@@ -370,13 +371,21 @@ class TE_PAI_Shadow_Spectro_Hardware:
                         Measurement_bit_string.append(bit)
         else:
             raw_data = []
-            for id in job_id:
+            for n,id in enumerate(job_id):
                 for sub_id in id:
                     raw_data.append(self.hardware.get_sampler_result(sub_id))
-
+                print("data from job id: ", n+1, "/", len(job_id))
             for sublist in raw_data:
                 for bits in sublist:
                     Measurement_bit_string.append(bits)
+                    
+            save_to_file(
+                self.file_name+"_measurement_bit_string",
+                folder_name=Folder_path,  # We suppose that the file is run in Frontier_Lab, such as 'python Hardware_simulation/post_process.py'
+                use_auto_structure=False,
+                format="pickle",
+                Measurement_bit_string=Measurement_bit_string)            
+                    
         Bit_string_array = self.deflatten_Time_evolve_bit_string_array(
             Measurement_bit_string
         )
@@ -414,9 +423,14 @@ class TE_PAI_Shadow_Spectro_Hardware:
             D.append(fk)
 
         D = np.array(D)
+        save_to_file(
+                self.file_name+"_Data_matrix",
+                folder_name=Folder_path,  # We suppose that the file is run in Frontier_Lab, such as 'python Hardware_simulation/post_process.py'
+                use_auto_structure=False,
+                format="pickle",
+                D=D)            
         
         solution, frequencies = self.shadow_spectro.spectro.Spectroscopy(D)
-
         return solution, frequencies
 
 

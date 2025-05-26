@@ -20,7 +20,7 @@ from TE_PAI.TE_PAI import TE_PAI
 from Shadow_Spectro.ClassicalShadow import ClassicalShadow
 from Shadow_Spectro.Spectroscopy import Spectroscopy
 from Shadow_Spectro.ShadowSpectro import ShadowSpectro
-from tools_box.quantum_tools import get_expectation_value
+from tools_box.quantum_tools import get_expectation_value, get_depth_from_qasm
 
 # Commented optional/debug tools
 # from Monitoring import PerformanceMonitor
@@ -43,9 +43,8 @@ class TE_PAI_Shadow_Spectroscopy:
    
     def __init__(self, hamil, delta: float, dt: float, Nt, shadow_size: int,
                  trotter_steps:float=1.e-4, PAI_error:float=0.1, N_trotter_max : int =8000,M_sample_max: int =1000,
-                 init_state: QuantumCircuit = None, K: int = 3):
-        """
-        Initialize the TE_PAI_Shadow_Spectroscopy class.
+                 init_state: QuantumCircuit = None, K: int = 3, noise_coef =None):
+        """Class constructor of TE_PAI_Shadow_Spectroscopy.
 
         Parameters
         ----------
@@ -79,7 +78,7 @@ class TE_PAI_Shadow_Spectroscopy:
         self.shadow_size = shadow_size
         self.hamil = hamil
         self.nq = hamil.nqubits
-        self.classical_shadow = ClassicalShadow()
+        self.classical_shadow = ClassicalShadow(noise_error=noise_coef)
         self.spectro = Spectroscopy(Nt, dt)
         self.Shadow_Spectro = ShadowSpectro(
             self.classical_shadow, self.spectro, self.nq, K, self.shadow_size
@@ -87,11 +86,14 @@ class TE_PAI_Shadow_Spectroscopy:
         self.No = self.Shadow_Spectro.No
         self.T = np.linspace(0, self.Nt * self.dt, self.Nt)
         self.density_matrix = False
-        self.num_processes = min(40, int(mp.cpu_count() * 0.5))
+        self.num_processes = min(40, int(mp.cpu_count() * 0.45))
         self.trotter_steps = trotter_steps
         self.PAI_error = PAI_error
         self.N_trotter_max=N_trotter_max
         self.M_sample_max=M_sample_max
+
+        
+        
         
     def loop_snapshots_circuit_TE_PAI_density_matrix(self,ms):
         """
@@ -212,11 +214,14 @@ class TE_PAI_Shadow_Spectroscopy:
                 n = len(os.listdir(folder_name))
                 folder_name = os.path.join(folder_name, f"Acquisition_{n+1}")
                 os.makedirs(folder_name)
+        self.depth = []
         for n, t in tqdm(enumerate(self.T), desc="Computing time evolution"):
             trotter = TE_PAI(self.hamil, self.nq, self.delta, t,
                                 trotter_steps=self.trotter_steps, PAI_error=self.PAI_error,N_trotter_max=self.N_trotter_max, 
                                 init_state=self.init_state, serialize=serialize, M_sample_max=self.M_sample_max)
-            trotter.gen_te_pai_circuits()                
+            trotter.gen_te_pai_circuits()
+            self.depth.append(get_depth_from_qasm(trotter.TE_PAI_Circuits))
+                            
             self.C, self.GAMMA = trotter.TE_PAI_Circuits, trotter.GAMMA
             self.TE_PAI_sample=len(self.C)
             self.ms_array = [i for i in range(self.TE_PAI_sample)]
@@ -231,6 +236,7 @@ class TE_PAI_Shadow_Spectroscopy:
                         os.path.join(folder_name, "Matrix_D") + str(n) + ".pickle", "wb"
                     ) as file:
                         pickle.dump(my_dict, file)
+        print("Average depth of the TE_PAI circuits:", np.mean(self.depth))
         return np.array(D)
 
     def main_te_pai_shadow_spectro(

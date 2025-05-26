@@ -48,6 +48,7 @@ if __name__ == "__main__":
     Nt : int = 150
     dt : float = 10/Nt
     M_sample_max : int =500
+    folder : str ="data"
     ################# Parameters ################# 
     
     
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     ############# Save Data ####################
     file_name = f"Heisenberg_Hamil_nq{numQs}_J{J(1)}_Nt{Nt}_dt{dt:.2}_NTrot{N_trotter_max}_NsTE{shadow_size_TE_PAI}_Ns{shadow_size}_PAIerror{PAI_error}_delta{delta:.2}_M_sample_max{M_sample_max}"
     # save data
-    folder, _ = save_to_file(file_name, "data", format="pickle",
+    save_to_file(file_name, folder_name=folder, format="pickle",use_auto_structure=False,
                              Nt=Nt, dt=dt, solution=solution, frequencies=frequencies,
                              solution_TE_PAI=solution_TE_PAI, frequencies_TE_PAI=frequencies_TE_PAI,
                              Energy_gap=hamil.energy_gap(), J=J(1))
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     plot_spectre(frequencies, solution, save_as=file_name +
                  "spectre_shadow", Folder=folder)
     plot_multiple_data([frequencies_TE_PAI, frequencies], [solution_TE_PAI, solution], labels=["TE_PAI", "Shadow"],
-                       title="TE_PAI Shadow spectroscopy and Shadow spectroscopy \n of a Transverse Ising Hamiltonian ",
+                       title="TE_PAI Shadow spectroscopy and Shadow spectroscopy \n of a Heisenberg Hamiltonian",
                        save_as=file_name+"spectre_Multi", Folder=folder)
 
     # plt.show()

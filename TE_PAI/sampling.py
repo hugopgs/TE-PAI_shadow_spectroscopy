@@ -19,23 +19,10 @@ def batch_sampling(probs, M_sample):
 
 @jit(nopython=True)
 def custom_random_choice(prob):
-    """
-    Given a list or array `prob`, where each element represents the probability of selecting an index,
-    this function performs a random choice and outputs a 1-based index.
-
-    Example:
-    --------
-    >>> prob = [0.2, 0.5, 0.3]
-    >>> custom_random_choice(prob)
-    2   # Example output (might be 1, 2, 3 based on the probabilities 0.2, 0.5, 0.3)
-    """
+    cdf = np.cumsum(prob)
     r = np.random.random()
-    cum_prob = 0.0
-    for idx in range(len(prob)):
-        cum_prob += prob[idx]
-        if r < cum_prob:
-            return idx + 1
-
+    idx = np.searchsorted(cdf, r)
+    return idx + 1
 
 @jit(nopython=True)
 def sample_from_prob(probs):

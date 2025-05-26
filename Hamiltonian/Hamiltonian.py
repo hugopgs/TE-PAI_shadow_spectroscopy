@@ -2,7 +2,7 @@
 # Date: 2024-01-05
 
 # Standard library imports
-import math
+import math, time
 from dataclasses import dataclass
 from itertools import product
 from typing import Callable, List, Tuple, Union
@@ -174,13 +174,13 @@ class Hamiltonian:
         eigval_list[np.abs(eigval_list) < 1.e-11] = 0
         return eigval_list.real
     
-    def get_ground_first_excited_state(self, threshold: float = 1e-2):
+    def get_ground_and_excited_state(self,n=1, threshold: float = 1e-2, get_dict: bool = False) -> Tuple[float, float, np.ndarray, np.ndarray]:
         H = self.matrix()
-        vals, vecs = eigsh(H, k=2, which='SA')
+        vals, vecs = eigsh(H, k=n+1, which='SA')
         ground_energy = vals[0]
-        first_excited_energy = vals[1]
+        first_excited_energy = vals[n]
         ground_state = vecs[:, 0]
-        first_excited_state = vecs[:, 1]
+        excited_state = vecs[:, n]
 
         # Z basis mapping
         z_basis = [''.join(state) for state in product('01', repeat=self.nqubits)]
@@ -190,11 +190,11 @@ class Hamiltonian:
                 for i in range(len(state_vector))
                 if abs(state_vector[i])**2 > threshold
             }
+        if get_dict:
+            ground_state = get_vector_dict(ground_state, z_basis, threshold)
+            excited_state = get_vector_dict(excited_state, z_basis, threshold)
 
-        ground_components = get_vector_dict(ground_state, z_basis, threshold)
-        excited_components = get_vector_dict(first_excited_state, z_basis, threshold)
-
-        return ground_energy, first_excited_energy, ground_components, excited_components
+        return ground_energy, first_excited_energy, ground_state, excited_state
     
     def energy_gap(self)->np.ndarray:
         """Calculate the energy gap between different energy levels.
@@ -219,7 +219,7 @@ class Hamiltonian:
 
 
 
-    def gen_quantum_circuit(self, T: float, init_state: Union[np.ndarray, list, QuantumCircuit] = None, N_Trotter_steps: int = 1000, serialize=False) -> QuantumCircuit:
+    def gen_quantum_circuit(self, T: float, init_state: Union[np.ndarray, list, QuantumCircuit] = None, N_Trotter_steps: int = 1000, serialize=False, decompose : bool=False) -> QuantumCircuit:
         """Generate a qiskit quantum circuite given a list of gates.
         Args:
             gates (tuple[str, list[int], float]): The list of gates to generate the circuit from, in the form of : ("Gate", [nq1, nq2], parameters)
@@ -246,7 +246,8 @@ class Hamiltonian:
 
         if isinstance(init_state, QuantumCircuit):
             circ = init_state.compose(circ, [i for i in range(nq)])
-
+        if decompose :
+            circ=circ.decompose(["rzz"])
         return circ
 
     def __rgate(self, pauli:str, r: float):

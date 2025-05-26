@@ -146,7 +146,7 @@ class ClassicalShadow:
             circuit_copy.measure_all()
             if backend is not None:
                 transpiled_circ = transpile(
-                    circuit_copy, backend, optimization_level=2)
+                    circuit_copy, backend, optimization_level=3)
                 return clifford_gates, transpiled_circ
             else:
                 return clifford_gates, circuit_copy
