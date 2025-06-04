@@ -51,19 +51,6 @@ class Ising_Hamil(Hamiltonian):
         self.name = f"Ising_J{J}_h{self.h}_g{self.g}_nq{n}"
         super().__init__(n, terms)
 
-    def create_excited_state_state(self):
-        """
-        Create a superposition state vector for nq qubits where the state is:
-        |ψ₁⟩ ≈ |00.01⟩ + |00.10⟩ + ... +|01.00⟩ + |10.00⟩
-        The vector is not normalized and contains only 0s and 1s.
-        """
-        state_vector = np.zeros(2**self.nqubits, dtype=int)
-
-        # Generate basis states with a single '1'
-        for pos in range(self.nqubits):
-            index = 1 << pos  # Equivalent to 2**pos
-            state_vector[index] = 1
-        return state_vector/np.linalg.norm(state_vector)
 
     
     
@@ -119,3 +106,15 @@ class Ising_Hamil(Hamiltonian):
         superposition.h(0)
         superposition.measure(0,0)
         return superposition
+
+    def get_trotter_steps_from_depth(self, depth: int) -> int:
+        """
+        Compute the number of Trotter steps based on the desired circuit depth.
+
+        Args:
+            depth (int): Desired circuit depth.
+
+        Returns:
+            int: Number of Trotter steps.
+        """
+        return int(depth / (self.nqubits + 1))

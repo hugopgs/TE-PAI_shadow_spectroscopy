@@ -39,16 +39,17 @@ class Hardware:
         load_account: str = None, # if you want to load an account, put the path of the account to load here 
         is_fake: bool = False, # if True, use a fake backend for testing
         set_backend: bool = True, # if True, set the backend to use for the quantum circuits
+        name_backend:str=None,
         initiate_service:bool= True): # if True, initiate the service with the token or the path of the account: if no token or path given it will 
                                       # try to connect using the default account.
         self.token = token
         self.is_fake = is_fake
         self.load_account = load_account
-        
+        self.name_backend = name_backend
         if initiate_service and not self.is_fake:
             self.__initiate_service(self.token, load_account)
         if set_backend:
-            self.set_backend(is_fake)
+            self.set_backend(is_fake, name=name_backend)
 
     def __initiate_service(self, token: str = None, save_account: bool = False, path_account: str = None):
         """
@@ -118,7 +119,7 @@ class Hardware:
         )
         print("account saved : in ", filename)
 
-    def set_backend(self, is_fake: bool = True):
+    def set_backend(self, is_fake: bool = True, name=None):
         """
             Sets the backend for running quantum circuits.
 
@@ -129,8 +130,16 @@ class Hardware:
         if is_fake:  # use a fake backend for testing
             self.backend = FakeManilaV2()
         else:  # use a real backend (QPU)
-            # self.backend = self.service.backend(name="ibm_strasbourg")
-            self.backend = self.service.least_busy()
+            if name is not None:
+                try:
+                    self.backend = self.service.backend(name=name)
+                except Exception as e:
+                    print(f"Error setting backend {name}: {e}")
+                    print("Trying to set the least busy backend instead.")
+                    self.backend = self.service.least_busy()
+            else:
+                # If no specific backend is provided, use the least busy backen
+                self.backend = self.service.least_busy()
         print("backend set to : ", self.backend)
 
     def send_sampler_pub(
@@ -197,8 +206,8 @@ class Hardware:
             job=self.service.job(id)
             nbits=job.inputs['pubs'][0][0].num_clbits
             npub=len(job.inputs['pubs'])
-            print(f"return : {"0"*nbits} for {npub} pub ")
-            return ["0"*nbits for _ in range(npub)]
+            print(f"return : {'0'*nbits} for {npub} pub ")
+            return ['0'*nbits for _ in range(npub)]
         t = time.time()
         while status != "DONE":
             print(

@@ -153,10 +153,9 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
     freq_max = []
     plt.figure(figsize=(10, 6))
     for i in range(len(X_list)):
-        plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i], linestyle=linestyle[i])
+        plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i%len(color)], linestyle=linestyle[i%len(linestyle)])
         pos_max = np.argsort(np.abs(Y_list[i]))[::-1]
         freq_max.append(X_list[i][pos_max[:len(Energy_gap)]])
-        print(freq_max)
     for i in range(len(Energy_gap)):
         plt.axvline(x=Energy_gap[i], color='gray', linestyle='--', linewidth=1,
                     label=f"Theoretical Energy Gap : {Energy_gap[i]:.3f}")

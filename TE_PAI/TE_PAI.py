@@ -2,6 +2,7 @@
 # Date: 2024-01-05
 
 # Standard library imports
+import re
 import time
 import multiprocessing as mp
 from dataclasses import dataclass
@@ -29,7 +30,7 @@ class TE_PAI:
     """
 
     def __init__(self, hamil, numQs, delta, T,
-                 trotter_steps=1.e-4, PAI_error=0.05, N_trotter_max=8000, M_sample_max=1000,
+                 trotter_steps=1.e-4, PAI_error=0.05, N_trotter_max=8000, M_sample_max=500,
                  init_state=None, serialize: bool = False):
         """
         Initialize the TE_PAI class.
@@ -47,6 +48,8 @@ class TE_PAI:
             serialize (bool, optional): Whether to serialize circuits to QASM. Defaults to False.
         """
         self.nq, self.delta, self.T = numQs, delta, T
+        self.N=N_trotter_max
+        
         self.N = int(T / trotter_steps)
         if self.N == 0:
             self.N = 1
@@ -64,10 +67,11 @@ class TE_PAI:
                               for angle in self.angles])
         self.terms = np.array([hamil.get_term(t) for t in steps], dtype=object)
 
-        # replace overhead by gamma
-        self.overhead_theo = np.exp(2 * hamil.l1_norm(T) * np.tan(delta / 2))
         self.overhead = self.gamma
+        
         self.M_sample = int((self.overhead**2/(PAI_error**2)))
+
+        
         if self.M_sample > M_sample_max:
             self.M_sample = M_sample_max
         if self.M_sample < 60:
@@ -81,6 +85,7 @@ class TE_PAI:
 
         self.init_state = init_state
         self.serialize = serialize
+
 
     def __del__(self):
         """
@@ -308,3 +313,35 @@ class TE_PAI:
         custom_instruction_list = [rxx_custom, ryy_custom, rzz_custom]
         return loads(qasm_str,  custom_instructions=custom_instruction_list)
 
+    def get_average_depth(self):
+        try : 
+            if self.serialize: 
+                res=0
+                for circ in self.TE_PAI_Circuits:
+                    qreg_match = re.search(r"qreg\s+(\w+)\[(\d+)\];", circ)
+                    if not qreg_match:
+                        raise ValueError("No qreg declaration found.")
+                    prefix, size = qreg_match.group(1), int(qreg_match.group(2))
+                    qubit_depths = [0] * size
+                    max_depth = 0
+                    # Only consider these gates
+                    gate_pattern = re.compile(
+                        r"(rx|rz|rxx|ryy|rzz)\s*\([^)]*\)\s+([a-zA-Z_]+\[\d+\](?:\s*,\s*[a-zA-Z_]+\[\d+\])?)\s*;",
+                        re.IGNORECASE
+                    )
+                    for match in gate_pattern.finditer(circ):
+                        gate = match.group(1).lower()
+                        qubit_args = match.group(2).replace(" ", "")
+                        qubits = [int(q.split('[')[1][:-1]) for q in qubit_args.split(",")]
+                        current_layer = max(qubit_depths[q] for q in qubits) + 1
+                        for q in qubits:
+                            qubit_depths[q] = current_layer
+                        max_depth = max(max_depth, current_layer)
+                    res+=max_depth
+                return res/self.M_sample
+            else :
+                return np.mean([self.TE_PAI_Circuits[i].depth() for i in range(self.M_sample)])
+        
+        except Exception as e: 
+            print("error : ", e)
+ 

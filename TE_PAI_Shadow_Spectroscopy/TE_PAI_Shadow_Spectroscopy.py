@@ -43,7 +43,7 @@ class TE_PAI_Shadow_Spectroscopy:
    
     def __init__(self, hamil, delta: float, dt: float, Nt, shadow_size: int,
                  trotter_steps:float=1.e-4, PAI_error:float=0.1, N_trotter_max : int =8000,M_sample_max: int =1000,
-                 init_state: QuantumCircuit = None, K: int = 3, noise_coef =None):
+                 init_state: QuantumCircuit = None, K: int = 3, noise_coef:list[float,float] =None):
         """Class constructor of TE_PAI_Shadow_Spectroscopy.
 
         Parameters
@@ -70,6 +70,8 @@ class TE_PAI_Shadow_Spectroscopy:
             Initial quantum state to apply before time evolution. Default is None.
         K : int, optional
             Specifies k-Pauli observables used for shadow estimation. Default is 3.
+        noise_coef : list[float,float], optional
+            Probability p1, p2 for noise model. See classical shadow 
         """
         self.delta = delta
         self.init_state = init_state
@@ -110,7 +112,7 @@ class TE_PAI_Shadow_Spectroscopy:
         np.ndarray
             The weighted density matrix corresponding to the circuit sample.
         """
-        Rho = self.classical_shadow.classical_shadow(self.C[ms], self.shadow_size, density_matrix=True)*self.GAMMA[ms]
+        Rho = self.Shadow_Spectro.classical_shadow(self.C[ms], density_matrix=True)*self.GAMMA[ms]
         return Rho
 
 
@@ -130,7 +132,7 @@ class TE_PAI_Shadow_Spectroscopy:
         np.ndarray
             The weighted expectation values for the snapshot.
         """
-        snapshots_shadow = self.Shadow_Spectro.get_snapshots_classical_shadow(
+        snapshots_shadow = self.Shadow_Spectro.classical_shadow(
             self.C[ms]
         )
         snapshot_expectation_values = (
@@ -220,8 +222,7 @@ class TE_PAI_Shadow_Spectroscopy:
                                 trotter_steps=self.trotter_steps, PAI_error=self.PAI_error,N_trotter_max=self.N_trotter_max, 
                                 init_state=self.init_state, serialize=serialize, M_sample_max=self.M_sample_max)
             trotter.gen_te_pai_circuits()
-            self.depth.append(get_depth_from_qasm(trotter.TE_PAI_Circuits))
-                            
+            self.depth.append(trotter.get_average_depth())
             self.C, self.GAMMA = trotter.TE_PAI_Circuits, trotter.GAMMA
             self.TE_PAI_sample=len(self.C)
             self.ms_array = [i for i in range(self.TE_PAI_sample)]
@@ -273,6 +274,7 @@ class TE_PAI_Shadow_Spectroscopy:
         """
         self.density_matrix = density_matrix
         self.Ljung = Ljung
+        self.depth=[]
         D = self.calculate_Data_matrix_te_pai_shadow_spectro(
             self.density_matrix,
             save_D=save_D,
@@ -282,4 +284,3 @@ class TE_PAI_Shadow_Spectroscopy:
         return solution, frequencies
 
    
-         

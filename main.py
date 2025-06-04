@@ -22,8 +22,8 @@ warnings.filterwarnings('ignore')
 
 
 
-################# Hamiltonian definition ################# 
-numQs = 10
+numQs = 4
+
 def J(t):
     return 1
 
@@ -39,13 +39,13 @@ if __name__ == "__main__":
     
     ################# Parameters ################# 
     delta : float = (np.pi / (2**7)) 
-    shadow_size_TE_PAI : int = 5
+    shadow_size_TE_PAI : int = 1
     shadow_size : int = 50
-    N_trotter_max : int = 900
+    N_trotter_max : int = 700
     trotter_step : float = 0.002
-    PAI_error : float = 0.1
+    PAI_error : float = 0.07
     k : int = 3
-    Nt : int = 150
+    Nt : int = 90
     dt : float = 10/Nt
     M_sample_max : int =500
     folder : str ="data"
@@ -54,32 +54,33 @@ if __name__ == "__main__":
     
     ######## Generation Initial State ########
     hamil = Hamil.Hamiltonian(numQs, terms)
-    ground_energy, first_excited_energy, ground_components, excited_components=hamil.get_ground_first_excited_state()
-    Initial_state=sum_state_vectors(excited_components, ground_components, numQs)
-    ######## Generation Initial State ########
+    ground_energy, first_excited_energy, ground_components, excited_components=hamil.get_ground_and_excited_state(n=10)
+    print("Theoretical energy gap : ",np.abs(ground_energy-first_excited_energy))
+    Initial_state= ground_components + excited_components
     
-    ######## Instance TE PAI Shadow spectroscopy #######
-    te_pai_shadow = TE_PAI_Shadow_Spectroscopy(
-        hamil, delta, dt, Nt, shadow_size_TE_PAI, K=k, trotter_steps=trotter_step, N_trotter_max=N_trotter_max, PAI_error=PAI_error, init_state=Initial_state, M_sample_max=M_sample_max)
+    
+    
+    ################  Simulations ################ 
+
     shadow = ClassicalShadow()
     spectro = Spectroscopy(Nt, dt)
     shadow_spectro = ShadowSpectro(shadow, spectro, numQs, k, shadow_size)
-     ######## Instance TE PAI Shadow spectroscopy #######
+    te_pai_shadow = TE_PAI_Shadow_Spectroscopy(
+        hamil, delta, dt, Nt, shadow_size_TE_PAI, K=k, trotter_steps=trotter_step, N_trotter_max=N_trotter_max, PAI_error=PAI_error, init_state=Initial_state, M_sample_max=M_sample_max)
     
-
-
-    ################  Simulations ################ 
+    # TE_PAI Shadow spectro
     solution_TE_PAI, frequencies_TE_PAI = te_pai_shadow.main_te_pai_shadow_spectro(
-        density_matrix=False, serialize=True)  #TE_PAI shadow spectro 
+        density_matrix=False, serialize=True)
+    
+    avg_depth=np.mean(te_pai_shadow.depth)
+    # Trotter shadow spectro 
     solution, frequencies = shadow_spectro.shadow_spectro(
-        hamil, init_state=Initial_state, N_Trotter_steps=1400, density_matrix=False, serialize=True, multiprocessing=True)  #shadow spectro
+        hamil, init_state=Initial_state, N_Trotter_steps=N_trotter_max, density_matrix=False, serialize=True, multiprocessing=True)
+    
     ################  Simulations ################ 
 
-
-
-
-    ############# Save Data ####################
-    file_name = f"Heisenberg_Hamil_nq{numQs}_J{J(1)}_Nt{Nt}_dt{dt:.2}_NTrot{N_trotter_max}_NsTE{shadow_size_TE_PAI}_Ns{shadow_size}_PAIerror{PAI_error}_delta{delta:.2}_M_sample_max{M_sample_max}"
+    ################  Save and plot  ################ 
+    file_name = f"spectrum_nq{numQs}_J{J(1)}_Nt{Nt}_dt{dt:.2}_NTrot{N_trotter_max}_Msample{M_sample_max}_NsTE{shadow_size_TE_PAI}_Ns{shadow_size}_delta{delta:.2}"
     # save data
     save_to_file(file_name, folder_name=folder, format="pickle",use_auto_structure=False,
                              Nt=Nt, dt=dt, solution=solution, frequencies=frequencies,
@@ -92,7 +93,7 @@ if __name__ == "__main__":
     plot_spectre(frequencies, solution, save_as=file_name +
                  "spectre_shadow", Folder=folder)
     plot_multiple_data([frequencies_TE_PAI, frequencies], [solution_TE_PAI, solution], labels=["TE_PAI", "Shadow"],
-                       title="TE_PAI Shadow spectroscopy and Shadow spectroscopy \n of a Heisenberg Hamiltonian",
+                       title="TE_PAI and Trotter spectrums",
                        save_as=file_name+"spectre_Multi", Folder=folder)
 
     # plt.show()

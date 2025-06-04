@@ -78,7 +78,7 @@ class Spectroscopy:
             vectors.append(eigenvectors[:, index])
         return vectors
 
-    def Ljung_Box_test(self, matrix: np.ndarray, ratio: int = 10) -> np.ndarray:
+    def Ljung_Box_test(self, matrix: np.ndarray, ratio: int = 5) -> np.ndarray:
         """ Ljung_Box test on the column of the given matrix. Return the best Nmax column as a 2d np.ndarray
 
         Args:

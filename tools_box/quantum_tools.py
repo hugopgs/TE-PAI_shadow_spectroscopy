@@ -683,3 +683,38 @@ def sum_state_vectors(vec1_dict, vec2_dict, N):
         full_vector[basis_index[state]] += amp
 
     return full_vector
+
+
+def enlever_doublons(liste):
+    resultat = []
+    vus = set()
+    for element in liste:
+        if element not in vus:
+            resultat.append(element)
+            vus.add(element)
+    return resultat
+
+
+def derivee(x, y):
+    if len(x) != len(y):
+        raise ValueError("Les listes x et y doivent avoir la même longueur.")
+    if len(x) < 2:
+        raise ValueError("Il faut au moins deux points pour calculer une dérivée.")
+
+    dydx = []
+    for i in range(1, len(x)):
+        dx = x[i] - x[i - 1]
+        dy = y[i] - y[i - 1]
+        dydx.append(dy / dx)
+    return dydx
+
+
+
+ 
+def get_vector_dict(state_vector,nqubits, threshold):
+    z_basis = [''.join(state) for state in itertools.product('01', repeat=nqubits)]
+    return {
+        z_basis[i]: complex(state_vector[i])
+        for i in range(len(state_vector))
+        if abs(state_vector[i])**2 > threshold
+    }
