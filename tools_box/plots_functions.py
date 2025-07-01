@@ -147,7 +147,7 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
                        y_label: str = "Amplitude,\n Arbitrary units", title: str = "Spectral cross correlation",
                        color: list =["red","green","blue"],
                        linestyle: list =  ['-','-', '-'],
-                       Energy_gap: list = [],
+                       Energy_gap: list = None,
                        save_as: str = None, Folder: str = "Data"):
 
     freq_max = []
@@ -156,11 +156,11 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
         plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i%len(color)], linestyle=linestyle[i%len(linestyle)])
         pos_max = np.argsort(np.abs(Y_list[i]))[::-1]
         freq_max.append(X_list[i][pos_max[:len(Energy_gap)]])
-    for i in range(len(Energy_gap)):
-        plt.axvline(x=Energy_gap[i], color='gray', linestyle='--', linewidth=1,
-                    label=f"Theoretical Energy Gap : {Energy_gap[i]:.3f}")
-        plt.text(Energy_gap[i] * 0.41, np.max(X_list) * (1 + 0.05), f"{Energy_gap[i]:.3f}",
-                 color='black', ha='left', va='center', fontsize=9)
+    # for i in range(len(Energy_gap)):
+    #     plt.axvline(x=Energy_gap[i], color='gray', linestyle='--', linewidth=1,
+    #                 label=f"Theoretical Energy Gap : {Energy_gap[i]:.3f}")
+    #     plt.text(Energy_gap[i] * 0.41, np.max(X_list) * (1 + 0.05), f"{Energy_gap[i]:.3f}",
+    #              color='black', ha='left', va='center', fontsize=9)
         # for j in range(len(X_list)):
             
         #     plt.axvline(x=freq_max[j][i],color=colors[j], linestyle='--', linewidth=1,
