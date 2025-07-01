@@ -70,6 +70,7 @@ class TE_PAI:
         self.overhead = self.gamma
         
         self.M_sample = int((self.overhead**2/(PAI_error**2)))
+        self.M_sample=  M_sample_max
 
         
         if self.M_sample > M_sample_max:
@@ -77,7 +78,7 @@ class TE_PAI:
         if self.M_sample < 60:
             self.M_sample = 60
             
-        self.num_processes = min(40, int(mp.cpu_count() * 0.5))
+        self.num_processes = min(30, int(mp.cpu_count() * 0.35))
 
         print("overhead:", self.overhead)
         print("M_sample:", self.M_sample)
