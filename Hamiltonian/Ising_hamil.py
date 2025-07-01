@@ -117,4 +117,4 @@ class Ising_Hamil(Hamiltonian):
         Returns:
             int: Number of Trotter steps.
         """
-        return int(depth / (self.nqubits + 1))
+        return int(depth / (self.nqubits + 4))

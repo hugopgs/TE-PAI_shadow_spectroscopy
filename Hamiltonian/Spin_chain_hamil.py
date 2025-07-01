@@ -49,6 +49,24 @@ class Spin_Chain_Hamil(Hamiltonian):
             (gate, [k, (k + 1)], J)
             for k, gate in product(range(n-1), ["XX", "YY", "ZZ"])
         ]
-        # terms += [("Z", [k], lambda t, k=k: freqs[k]) for k in range(n)]
+        terms += [("Z", [k], lambda t, k=k: freqs[k]) for k in range(n)]
+        terms += [("X", [k], lambda t, k=k: freqs[k]) for k in range(n)]
         self.name = f"SpinChain_nq{n}"
         super().__init__(n, terms)
+
+    def get_trotter_steps_from_depth(self, depth: int,) -> int:
+        """
+        Calculate the number of Trotter steps required to achieve a given circuit depth.
+
+        Args:
+            depth (int): The desired circuit depth.
+            T (float): The total evolution time.
+
+        Returns:
+            int: The number of Trotter steps.
+        """
+        trot=int((depth - (3*self.nqubits-3)) / 8)
+        if trot < 1:
+            return 1
+        else:
+            return trot
