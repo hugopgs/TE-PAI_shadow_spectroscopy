@@ -37,8 +37,12 @@ class Ising_Hamil(Hamiltonian):
     nqubits: int
     terms: List[Tuple[str, List[int], Callable[[float], float]]]
 
-    def __init__(self, n, J, transverse: float = None, longitudinal: float = None):
-        terms = [("ZZ", [k, (k + 1) % n], lambda t: -1*J)for k in range(n)]
+    def __init__(self, n, J, transverse: float = None, longitudinal: float = None, fully_connected : bool= False):
+        self.fully_connected=fully_connected
+        if fully_connected:
+            terms = [("ZZ", [k, j], lambda t: -1 * J) for k in range(n) for j in range(k + 1, n)]
+        else : 
+            terms = [("ZZ", [k, (k + 1) % n], lambda t: -1*J)for k in range(n)]
         self.J = J
         self.g = 0
         self.h = 0
@@ -50,6 +54,7 @@ class Ising_Hamil(Hamiltonian):
             terms += [("Z", [k], lambda t: -1*self.h) for k in range(n)]
         self.name = f"Ising_J{J}_h{self.h}_g{self.g}_nq{n}"
         super().__init__(n, terms)
+
 
 
     
@@ -117,4 +122,8 @@ class Ising_Hamil(Hamiltonian):
         Returns:
             int: Number of Trotter steps.
         """
-        return int(depth / (self.nqubits + 4))
+        if self.fully_connected : 
+            N_trot=int((depth-(self.nqubits-2.4)) / (1.1*self.nqubits + 1.4))
+        else:
+            N_trot=int(depth/ (self.nqubits + 2))
+        return N_trot

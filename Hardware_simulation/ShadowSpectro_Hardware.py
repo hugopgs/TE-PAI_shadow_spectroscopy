@@ -3,14 +3,20 @@
 
 # Standard library imports
 from itertools import chain
+import time
 from typing import Union
+import os, sys 
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Third-party imports
 import numpy as np
 from tqdm import tqdm
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import UnitaryGate
-
+from qiskit_ibm_runtime import SamplerV2 as Sampler, Batch, Options
+import multiprocessing as mp 
+from tools_box.data_file_functions import save_to_file
 
 class ShadowSpectro_Hardware():
     """
@@ -40,9 +46,11 @@ class ShadowSpectro_Hardware():
         self.shadow = shadow_spectro.shadow
         self.shadow_size = self.shadow_spectro.shadow_size
         self.nq = self.shadow_spectro.nq
+        self.num_processes = min(30, int(mp.cpu_count() * 0.25))
+        
         pass
 
-    def get_time_evolve_circuits(self, hamil, init_state: Union[np.ndarray, list, QuantumCircuit] = None, verbose: bool = True, backend=None,  N_trotter_step: int = 1000):
+    def get_time_evolve_circuits(self, hamil, init_state: Union[np.ndarray, list, QuantumCircuit] = None, verbose: bool = True,  N_Trotter_steps: int = 1000):
         """
         Generate time-evolution circuits with random Clifford layers for classical shadows.
 
@@ -61,37 +69,68 @@ class ShadowSpectro_Hardware():
         
         T = np.linspace(0, self.shadow_spectro.Nt *
                         self.shadow_spectro.dt, self.shadow_spectro.Nt)
-        Time_evolve_circuit_array = []
+        self.file_name = f"Shadow_spectro_nq{self.nq}_Nt{self.shadow_spectro.Nt}_dt{self.shadow_spectro.dt:.2}_NTrot{N_Trotter_steps}_Ns{self.shadow_size}"
         Time_evolve_Clifford_array = []
         try:
             if isinstance(hamil(1), UnitaryGate):
                 flag = True
         except:
             flag = False
-
+        job_res=[]
+        if not self.hardware.is_fake: 
+            batch=Batch(backend=self.hardware.backend)
+            print(batch.details())
+            self.sampler = Sampler(mode=batch)
+            print("waiting 2 min starting...")
+            time.sleep(120)
+        else: 
+            self.sampler = Sampler(self.hardware.backend)
+        
         for t in tqdm(T, desc="Generate circuit Time evolution", disable=not verbose):
+            Time_evolve_circuit_array=[]
             if flag:
                 circ = QuantumCircuit(self.nq)
                 if isinstance(init_state, (np.ndarray, list)):
                     circ.initialize(init_state, normalize=True)
                 circ.append(hamil(t), [n for n in range(self.nq)])
-                C = circ.copy()
+                circ.copy()
                 if isinstance(init_state, QuantumCircuit):
-                    C = init_state.compose(circ, [i for i in range(self.nq)])
+                    self.C = init_state.compose(circ, [i for i in range(self.nq)])
             else:
-                C = hamil.gen_quantum_circuit(
-                    t, init_state=init_state,  N_trotter_step=N_trotter_step)
+                self.C = hamil.gen_quantum_circuit(
+                    t, init_state=init_state,  N_Trotter_steps=N_Trotter_steps)
 
             Clifford_Gate_array = []
-            for i in range(self.shadow_size):
-                clifford_gate, circuit = self.shadow.add_random_clifford(
-                    C, copy=True, backend=backend)
-                Clifford_Gate_array.append(clifford_gate)
-                Time_evolve_circuit_array.append(circuit)
-
+            with mp.Pool(processes=self.num_processes) as pool :
+                res=pool.map(self.classical_shadow, [i for i in range(self.shadow_size)])
+            Clifford_Gate_array, Time_evolve_circuit_array=zip(*res)           
+            
+            
             Time_evolve_Clifford_array.append(Clifford_Gate_array)
+            print("depth circuits : ", Time_evolve_circuit_array[0].depth())
+            N=int(len(Time_evolve_circuit_array)/500)
+            if N==0:
+                N=1
+            list_pubs_for_sampling= self.split_list_into_n_sublists(Time_evolve_circuit_array, N)
+            
+            sub_job=[]
+            for n, sub_list in enumerate(list_pubs_for_sampling): 
+                job = self.sampler.run(sub_list, shots=1)  
+                print("number of pub:", len(sub_list))
+                print(f"Done sending sub circuits to backend {n+1}/{len(list_pubs_for_sampling)}")
+                self.hardware.print_job_info(job)
+                if self.hardware.is_fake:  # If the backend is fake, we can get the data directly
+                    sub_job.append(self.hardware.get_data_from_results(job.result()))
+                else:  # If the backend is QPU, we need to get the job id. We fetch the result from the job id later
+                    sub_job.append(job.job_id())
+            
+            job_res.append(sub_job)
+            print("#################################################")
+        save_to_file(self.file_name+"_data","Hardware_simulation",  # We suppose that the file is run in Frontier_Lab, such as 'python Hardware_simulation/post_process.py'
+            use_auto_structure=False,
+            format="pickle",
+            Nt= self.shadow_spectro.Nt, dt= self.shadow_spectro.dt, nq=self.nq, Time_evolve_Clifford_array=Time_evolve_Clifford_array,shadow_size=self.shadow_size, job_res=job_res)    
 
-        return Time_evolve_circuit_array, Time_evolve_Clifford_array
 
     def send_sampler_pub(self, pubs):
         """
@@ -127,7 +166,7 @@ class ShadowSpectro_Hardware():
             Time_evolve_bit_string_array.append(tmp)
         return Time_evolve_bit_string_array
 
-    def get_data_matrix_from_hardware(self, job_id: str, Clifford: list[list[UnitaryGate]], density_matrix: bool = True, verbose: bool = False, res_fake_backend: list = None):
+    def get_data_matrix_from_hardware(self, job_id: str, Clifford: list[list[UnitaryGate]], density_matrix: bool = True, verbose: bool = False):
         """
         Reconstruct the data matrix from hardware results, using classical shadows.
 
@@ -144,19 +183,7 @@ class ShadowSpectro_Hardware():
                 - Extracted frequency components (array).
         """
         
-        Measurement_bit_string = []
-        if res_fake_backend is not None:
-            Measurement_bit_string = res_fake_backend
-        else:
-            raw_data = []
-            for id in job_id:
-                raw_data.append(self.hardware.get_sampler_result(id))
-
-            for sublist in raw_data:
-                for bits in sublist:
-                    Measurement_bit_string.append(bits)
-        Bit_string_array = self.deflatten_Time_evolve_bit_string_array(
-            Measurement_bit_string)
+        Bit_string_array=self.get_res_from_hardware(job_id)
         D = []
         for t in tqdm(range(self.shadow_spectro.Nt), desc="Spectral cross_correlation", disable=not verbose):
             if density_matrix:
@@ -165,15 +192,79 @@ class ShadowSpectro_Hardware():
                     Rho += self.shadow.snapshot_density_matrix(
                         Clifford[t][i], Bit_string_array[t][i])
                 Rho = Rho/self.shadow_size
-                fkt = self.shadow_spectro.expectation_value_q_Pauli(
-                    0, 0, density_matrix=Rho)
+                fkt = self.shadow_spectro.expectation_value_q_pauli(Rho, multiprocessing=True)
                 D.append(fkt.tolist())
             else:
-                fkt = self.shadow_spectro.expectation_value_q_Pauli(
-                    Clifford[t], Bit_string_array[t])
+                fkt = self.shadow_spectro.expectation_value_q_pauli((Clifford[t], Bit_string_array[t]),multiprocessing=True)
                 D.append(fkt.tolist())
-        D = np.array(D).real
+        D = np.array(D)
 
         solution, frequencies = self.shadow_spectro.spectro.Spectroscopy(D)
 
         return solution, frequencies
+
+    def split_list_into_n_sublists(self,lst, n):
+        """
+        Splits a list `lst` into `n` sublists, distributing elements as evenly as possible.
+        
+        Args:
+            lst (list): The list to split.
+            n (int): Number of sublists to split into.
+        
+        Returns:
+            List[List]: A list of `n` sublists.
+        """
+        k, r = divmod(len(lst), n)  # k = size of each sublist, r = remainder
+        sublists = []
+        start = 0
+        for i in range(n):
+            end = start + k + (1 if i < r else 0)
+            sublists.append(lst[start:end])
+            start = end
+        return sublists
+    
+    
+    
+    
+    
+    def get_res_from_hardware(
+        self,
+        job_id: str,
+        Folder_path="data/Hardware_simulation/",
+    ):
+        Measurement_bit_string = []
+        if self.hardware.is_fake :
+            for sub_list in job_id: 
+                for sub_sub_list in sub_list : 
+                    for bit in sub_sub_list:
+
+                        Measurement_bit_string.append(bit)
+
+        else:
+            raw_data = []
+            for n,id in enumerate(job_id):
+                print("data from job id: ", n, "/", len(job_id)-1)
+                for sub_id in id:
+                    raw_data.append(self.hardware.get_sampler_result(sub_id))
+                
+            for sublist in raw_data:
+                for bits in sublist:
+                    Measurement_bit_string.append(bits)
+                    
+            save_to_file(
+                self.file_name+"_measurement_bit_string",
+                folder_name="Hardware_simulation",  # We suppose that the file is run in Frontier_Lab, such as 'python Hardware_simulation/post_process.py'
+                use_auto_structure=False,
+                format="pickle",
+                Measurement_bit_string=Measurement_bit_string)            
+                    
+        Bit_string_array = self.deflatten_Time_evolve_bit_string_array(
+            Measurement_bit_string
+        )
+
+        return Bit_string_array
+    
+    def classical_shadow(self, _):
+        clifford_gate, circuit = self.shadow.add_random_clifford(
+                    self.C, copy=True, backend=self.hardware.backend)
+        return clifford_gate, circuit

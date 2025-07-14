@@ -2,6 +2,7 @@
 # Date: 2024-01-05
 
 # Standard library imports
+from multiprocessing.pool import ThreadPool
 import re
 import time
 import multiprocessing as mp
@@ -70,15 +71,14 @@ class TE_PAI:
         self.overhead = self.gamma
         
         self.M_sample = int((self.overhead**2/(PAI_error**2)))
-        self.M_sample=  M_sample_max
-
+        self.M_sample=M_sample_max
         
         if self.M_sample > M_sample_max:
             self.M_sample = M_sample_max
         if self.M_sample < 60:
             self.M_sample = 60
             
-        self.num_processes = min(30, int(mp.cpu_count() * 0.35))
+        self.num_processes = min(30, int(mp.cpu_count() * 0.25))
 
         print("overhead:", self.overhead)
         print("M_sample:", self.M_sample)
@@ -86,6 +86,19 @@ class TE_PAI:
 
         self.init_state = init_state
         self.serialize = serialize
+        from qiskit import transpile
+
+        if isinstance(self.init_state, (np.ndarray, list)):
+            init_circ = QuantumCircuit(self.nq)
+            init_circ.initialize(self.init_state, list(range(self.nq)), normalize=True)
+            self._cached_init_circ = transpile(init_circ, optimization_level=1)
+
+        elif isinstance(self.init_state, QuantumCircuit):
+            self._cached_init_circ = self.init_state.copy()
+
+
+
+
 
 
     def __del__(self):
@@ -109,8 +122,9 @@ class TE_PAI:
         t = time.time()
         index = sampling.batch_sampling(self.probs, self.M_sample)
         res = []
+        chunk_size = max(1, self.M_sample// (self.num_processes*5))
         with mp.Pool(self.num_processes) as pool:
-            res += pool.map(self.gen_cir_from_index, index)
+            res += pool.map(self.gen_cir_from_index, index, chunksize=chunk_size)
         print("time to generate from index :", time.time() - t)
         gates_array, self.GAMMA = zip(*res)
         self.GAMMA = np.array(self.GAMMA)
@@ -119,8 +133,8 @@ class TE_PAI:
         t2 = time.time()
         with mp.Pool(self.num_processes) as pool:
             self.TE_PAI_Circuits += pool.map(
-                self.gen_quantum_circuit, gates_array)
-        print("time to generate from gates array:", time.time() - t2)
+                self.gen_quantum_circuit, gates_array, chunksize=chunk_size)
+        print("time to generate quantum circuit :", time.time() - t2)
         print("Total time:", time.time() - t)
 
     def get_expectation_value(self, observable, multiprocessing=True):
@@ -230,16 +244,12 @@ class TE_PAI:
         if self.serialize:
             return self.gen_Qasm_circuit(gates)
         circ = QuantumCircuit(self.nq)
-        if isinstance(self.init_state, (np.ndarray, list)):
-            circ.initialize(
-                self.init_state, [i for i in range(self.nq)], normalize=True
-            )
         for pauli, qubits, coef in gates:
             circ.append(self.rgate(pauli, coef), qubits)
 
-        if isinstance(self.init_state, QuantumCircuit):
-            copy_init = self.init_state.copy()
-            circ = copy_init.compose(circ, [i for i in range(self.nq)])
+        # Apply the initialization circuit before the rotations
+        if hasattr(self, "_cached_init_circ") and self._cached_init_circ is not None:
+            circ = self._cached_init_circ.compose(circ, front=True)
 
         return circ
 

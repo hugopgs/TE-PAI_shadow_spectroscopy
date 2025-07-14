@@ -25,32 +25,19 @@ terms = [
     for k, gate in product(range(numQs-1), ["XX", "YY", "ZZ"])
     ]
 
-# numQs = 8
-
-# def J(_):
-#     return -1*0.8
-
-
-# def h(_):
-#     return -1*0.2
-
-
-# terms = [("ZZ", [k, (k + 1) % numQs], J)for k in range(numQs)]
-# terms += [("X", [k], h) for k in range(numQs)]
-
 
 if __name__ == "__main__":
     # # Parameters :
     k: int = 3  # K Pauli observable
     # shadow_size: int = 35  # Shadow size
     shadow_size: int =  1 # Shadow size
-    Nt: int = 90 # Number of time steps
+    Nt: int = 70 # Number of time steps
     delta: float = np.pi / 2**6 # Trotter Delta
-    dt: float = 6/Nt  # Time step
+    dt: float = 2/Nt  # Time step
 
     # Hamiltonian:
     hamil = Hamiltonian(numQs, terms)
-    ground_energy, first_excited_energy, ground_components, excited_components =  hamil.get_ground_and_excited_state()
+    ground_energy, first_excited_energy, ground_components, excited_components =  hamil.get_ground_and_excited_state(n=40)
     Initial_state = ground_components + excited_components
 
     # Creation Shadow spectro
@@ -64,10 +51,10 @@ if __name__ == "__main__":
         Nt,
         shadow_size,
         K=k,
-        trotter_steps=0.001,
-        N_trotter_max=300,
-        M_sample_max=3000,
-        PAI_error=0.03,
+        trotter_steps=0.005,
+        N_trotter_max=150,
+        M_sample_max=2_100,
+        PAI_error=0.001,
         init_state=Initial_state,
     )
 
@@ -78,10 +65,11 @@ if __name__ == "__main__":
 
     # from the second time
     # token = "your API token"
-    token = None
+    token = "a45a83ee7019f1014b4127be22db5603bb491fbb1c9785f839c816be85c62d629584c756100bcb9eb0fb0fef59d22218354e390f558a2321e6e06bd4c7de0869"
     is_save = False
 
-    hardware = Hardware(token, set_backend=True, name_backend="ibm_torino")
+
+    hardware = Hardware(token, set_backend=True, is_fake=False, name_backend="ibm_aachen")
     # is_fake=False: QPU
     # -------- Hardware settings --------
 
@@ -96,5 +84,5 @@ if __name__ == "__main__":
     # bit_string_array, Time_evolve_Clifford_array, GAMMA = (
     #     TE_PAI_Shadow_Hardware.send_time_evolve_circuits(verbose=True)
     # )
-    hardware
-    TE_PAI_Shadow_Hardware.send_time_evolve_circuitsV2(verbose=True)
+
+    TE_PAI_Shadow_Hardware.send_time_evolve_circuits(verbose=True)

@@ -83,26 +83,30 @@ def test_arg_type():
         
         
 def test_TE_PAI():
-    nq = 10
-    delta = np.pi /(2**7)
-    hamil = Ising_Hamil(nq,0.1,1)
+    nq = 6
+    delta = np.pi /(2**6)
+    # hamil = Ising_Hamil(nq,0.1,1)
     trotter_steps=0.012
-    N_trotter_max=900
-    M_sample_max=600
-    PAI_error=0.06
-    # hamil=Heisenberg_Hamil(nq,1,1,1)
-    # T =np.linspace(0., 12, 10)
+    N_trotter_max=200
+    M_sample_max=1500
+    PAI_error=0.01
+    hamil=Heisenberg_Hamil(nq,1,1,1)
+    ground_energy, first_excited_energy, ground_components, excited_components =  hamil.get_ground_and_excited_state(n=15)
+    print("energy gap:", first_excited_energy-ground_energy)
+    
     observables = get_q_local_Pauli(nq, 1)[:3]
     qc = QuantumCircuit(nq)
     qc.h(i for i in range(nq-1))
     res_PAI=[]
     res_Ideal=[]
     observables=["X"]
-    T=[10] 
+    T=np.linspace(0, 3, 4)
+    # T=[3.5] 
     for t in T:
         trotter = TE_PAI(hamil, nq, delta, t,init_state=qc,trotter_steps=trotter_steps, PAI_error=PAI_error,N_trotter_max=N_trotter_max,serialize=True, M_sample_max=M_sample_max)
         trotter.gen_te_pai_circuits()
-        circ_hamil=hamil.gen_quantum_circuit(t,N_Trotter_steps=1000,init_state=qc)
+        circ_hamil=hamil.gen_quantum_circuit(t,N_Trotter_steps=N_trotter_max,init_state=qc)
+        print(trotter.get_average_depth())
         for obs in observables:
             res_PAI.append(trotter.get_expectation_value("".join(obs), multiprocessing=False)[0])
             res_Ideal.append(get_expectation_value(circ_hamil,"".join(obs)))
@@ -135,3 +139,4 @@ def test_number_of_gate():
     plot_data(T,Gate_max,title="Maximum number of gate per iteration, for 4 Qubits Transverse Ising Hamiltonian")
     plt.show() 
         
+test_TE_PAI()

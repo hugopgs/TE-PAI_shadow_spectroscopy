@@ -9,10 +9,12 @@ import time
 import multiprocessing as mp
 
 # Third-party imports
+import numpy as np
 from tqdm import tqdm
 from qiskit import QuantumCircuit, transpile
 from qiskit_ibm_runtime import SamplerV2, QiskitRuntimeService
-from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+from qiskit_ibm_runtime.fake_provider import  FakeAlgiers
+
 
 
 class Hardware:
@@ -93,8 +95,7 @@ class Hardware:
         if connection_failure:
             print("try to recconect to the service")
         else:
-            account = self.service.active_account()
-        print("connected to : ", self.service)
+            print("connected to : ", self.service)
 
     def save_account(self, filename: str = "Qiskit_service", set_as_default: bool = True):
         """
@@ -128,7 +129,7 @@ class Hardware:
                                 If False, select a real hardware backend based on supported gates.
         """
         if is_fake:  # use a fake backend for testing
-            self.backend = FakeManilaV2()
+            self.backend = FakeAlgiers()
         else:  # use a real backend (QPU)
             if name is not None:
                 try:
@@ -202,7 +203,7 @@ class Hardware:
         
         if status == "CANCELLED" or status == "ERROR":
             print( f"No results for job : {id}, reason : job {status}")
-            
+            print(self.service.job(id).error_message())
             job=self.service.job(id)
             nbits=job.inputs['pubs'][0][0].num_clbits
             npub=len(job.inputs['pubs'])
@@ -291,9 +292,14 @@ class Hardware:
             if pub.data.meas.num_shots == 1:
                 bit_string = str(list(pub.data.meas.get_counts().keys())[0])
             else:
-                bit_string = pub.data.meas.get_counts()
+                counts = pub.data.meas.get_counts()
+                bit_string=max(counts.items(), key=lambda x: x[1])[0]
             bit_string_array.append(bit_string)
         return bit_string_array
+
+    def most_likely_bitstring(counts):
+        return max(counts.items(), key=lambda x: x[1])[0]
+
 
 
     def get_backends_by_basis_gates(self,
@@ -334,3 +340,71 @@ class Hardware:
                 matching.append(backend.name)
 
         return matching
+    
+    
+    
+    
+    # def error_mitigation_1(self, n_qubits):
+ 
+    #     import numpy as np
+    #     from collections import Counter
+
+    #     n_qubits = 2
+    #     qubit_list = list(range(n_qubits))
+
+    #     # STEP 1: Generate measurement calibration circuits
+    #     # For 2 qubits → prepare |00>, |01>, |10>, |11>
+    #     calib_circuits = []
+    #     calib_states = ['00', '01', '10', '11']
+
+    #     for state in calib_states:
+    #         qc = QuantumCircuit(n_qubits, n_qubits)
+    #         for i, bit in enumerate(reversed(state)):
+    #             if bit == '1':
+    #                 qc.x(i)
+    #         qc.measure(range(n_qubits), range(n_qubits))
+    #         calib_circuits.append(qc)
+
+    #     # STEP 2: Transpile and run calibration circuits
+    #     transpiled_calibs = transpile(calib_circuits, backend=self.backend)
+    #     job = self.backend.run(transpiled_calibs, shots=8192)
+    #     print(f"calibration job_id : {job.job_id()}")
+    #     return job.job_id()
+        
+    # def error_mitigation_2(self, n_qubits, id):
+    #     calib_result = self.get_job_result(id)
+
+    #     # STEP 3: Build the confusion matrix
+    #     # confusion_matrix[i][j] = P(measured=j | prepared=i)
+    #     confusion_matrix = np.zeros((4, 4))  # 4 states: 00, 01, 10, 11
+    #     calib_states=['00', '01', '10', '11']
+    #     for i, state in enumerate(calib_states):
+    #         counts = calib_result.get_counts(i)
+    #         total = sum(counts.values())
+    #         for meas_str, count in counts.items():
+    #             j = calib_states.index(meas_str)
+    #             confusion_matrix[i, j] = count / total
+
+    #     # STEP 4: Invert the matrix for mitigation
+    #     inv_confusion_matrix = np.linalg.pinv(confusion_matrix)
+    #     return inv_confusion_matrix, calib_states
+
+    # def apply_mitigation(self, counts, inv_matrix, states ):
+    #     # Convert raw counts to vector
+    #     vec = np.zeros(len(states))
+    #     total = sum(counts.values())
+    #     for state, count in counts.items():
+    #         i = states.index(state)
+    #         vec[i] = count / total
+    #     # Apply inverse confusion matrix
+    #     mitigated_vec = inv_matrix @ vec
+    #     # Renormalize and clip negatives
+    #     mitigated_vec = np.clip(mitigated_vec, 0, None)
+    #     mitigated_vec /= np.sum(mitigated_vec)
+    #     # Convert back to counts
+    #     mitigated_counts = {states[i]: mitigated_vec[i] * total for i in range(len(states))}
+    #     return mitigated_counts
+
+
+def most_likely_bitstring(counts):
+    return max(counts.items(), key=lambda x: x[1])[0]

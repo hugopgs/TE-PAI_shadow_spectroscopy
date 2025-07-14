@@ -88,7 +88,7 @@ class TE_PAI_Shadow_Spectroscopy:
         self.No = self.Shadow_Spectro.No
         self.T = np.linspace(0, self.Nt * self.dt, self.Nt)
         self.density_matrix = False
-        self.num_processes = min(30, int(mp.cpu_count() * 0.35))
+        self.num_processes = min(30, int(mp.cpu_count() * 0.20))
         self.trotter_steps = trotter_steps
         self.PAI_error = PAI_error
         self.N_trotter_max=N_trotter_max

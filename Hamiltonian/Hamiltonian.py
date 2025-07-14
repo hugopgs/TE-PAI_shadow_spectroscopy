@@ -134,7 +134,7 @@ class Hamiltonian:
             return f"Hamiltonian object : nq={self.nqubits}, number of terms :{len(self.terms)}"
 
 
-    def matrix(self)->np.ndarray:
+    def matrix(self, t=0)->np.ndarray:
         """Return the matrix representation of the hamiltonian 
 
         Returns:
@@ -165,8 +165,7 @@ class Hamiltonian:
             if term[0] == 'ZZ':
                 tmp[term[1][0]] = Z
                 tmp[term[1][1]] = Z
-            H+=(term[2](1)*reduce(lambda A, B: sp.kron(A, B, format='csr'), tmp))
-        self.H=H
+            H+=(term[2](t)*reduce(lambda A, B: sp.kron(A, B, format='csr'), tmp))
         return H
 
     def eigenvalues(self) -> np.ndarray:
@@ -182,8 +181,8 @@ class Hamiltonian:
         eigval_list[np.abs(eigval_list) < 1.e-11] = 0
         return eigval_list.real
     
-    def get_ground_and_excited_state(self,n=1, threshold: float = 1e-2, get_dict: bool = False) -> Tuple[float, float, np.ndarray, np.ndarray]:
-        H = self.matrix()
+    def get_ground_and_excited_state(self,n=1,t=0, threshold: float = 1e-2, get_dict: bool = False) -> Tuple[float, float, np.ndarray, np.ndarray]:
+        H = self.matrix(t)
         vals, vecs = eigsh(H, k=n+1, which='SA')
         ground_energy = vals[0]
         first_excited_energy = vals[n]

@@ -52,7 +52,7 @@ class ShadowSpectro:
         self.W = self.V@self.V
         self.gate_set = {"X": self.X, "Y": self.Y, "Z": self.Z, "I": self.I, "S": self.S,
                          "H": self.H, "V": self.V, "W": self.W}
-        self.num_processes = min(30, int(mp.cpu_count()*0.35))
+        self.num_processes = min(40, int(mp.cpu_count()*0.5))
         self.multiprocessing=False
 
     def expectation_value_q_pauli(self, snapshots_shadow:Union[np.ndarray, tuple[list[list[str]], list[str]]], multiprocessing: bool=False) -> np.ndarray:

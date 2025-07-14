@@ -147,7 +147,7 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
                        y_label: str = "Amplitude,\n Arbitrary units", title: str = "Spectral cross correlation",
                        color: list =["red","green","blue"],
                        linestyle: list =  ['-','-', '-'],
-                       Energy_gap: list = None,
+                       axvline: list = [],
                        save_as: str = None, Folder: str = "Data"):
 
     freq_max = []
@@ -155,18 +155,13 @@ def plot_multiple_data(X_list: list[list], Y_list: list[list],
     for i in range(len(X_list)):
         plt.plot(X_list[i], Y_list[i], label=labels[i],  color=color[i%len(color)], linestyle=linestyle[i%len(linestyle)])
         pos_max = np.argsort(np.abs(Y_list[i]))[::-1]
-        freq_max.append(X_list[i][pos_max[:len(Energy_gap)]])
-    # for i in range(len(Energy_gap)):
-    #     plt.axvline(x=Energy_gap[i], color='gray', linestyle='--', linewidth=1,
-    #                 label=f"Theoretical Energy Gap : {Energy_gap[i]:.3f}")
-    #     plt.text(Energy_gap[i] * 0.41, np.max(X_list) * (1 + 0.05), f"{Energy_gap[i]:.3f}",
-    #              color='black', ha='left', va='center', fontsize=9)
-        # for j in range(len(X_list)):
-            
-        #     plt.axvline(x=freq_max[j][i],color=colors[j], linestyle='--', linewidth=1,
-        #                 label=f"Energy Gap :{labels[j]}:  {freq_max[j][i]:.2f}")
-            # plt.text(freq_simulation * 0.5, max(solution_simulation) * 0.95,
-            #         f"{"{:.2e}".format(freq_simulation)}", color='red', ha='left', va='center', fontsize=9)
+        freq_max.append(X_list[i][pos_max[:len(axvline)]])
+    for i in range(len(axvline)):
+        plt.axvline(x=axvline[i], color='gray', linestyle='--', linewidth=1,
+                    label=f"Theoretical Energy Gap : {axvline[i]:.3f}")
+        plt.text(axvline[i] * 0.41, np.max(X_list) * (1 + 0.05), f"{axvline[i]:.3f}",
+                 color='black', ha='left', va='center', fontsize=9)
+        
 
     plt.grid(True, linestyle='--', color='gray', linewidth=0.5, alpha=0.7)
     # 'both' applies to x and y axis

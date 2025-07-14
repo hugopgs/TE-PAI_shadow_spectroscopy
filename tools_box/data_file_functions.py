@@ -75,7 +75,6 @@ def get_keywords_pickle_file(path: str) -> list[str]:
     """
     with (open(path, "rb") as fx):
         datax = pickle.load(fx)
-        print(datax)
     print("keyword : {0}".format(datax.keys()))
     return list(datax.keys())
 
