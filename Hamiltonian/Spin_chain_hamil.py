@@ -49,6 +49,6 @@ class Spin_Chain_Hamil(Hamiltonian):
             (gate, [k, (k + 1)], J)
             for k, gate in product(range(n-1), ["XX", "YY", "ZZ"])
         ]
-        # terms += [("Z", [k], lambda t, k=k: freqs[k]) for k in range(n)]
+        terms += [("Z", [k], lambda t, k=k: freqs[k]) for k in range(n)]
         self.name = f"SpinChain_nq{n}"
         super().__init__(n, terms)

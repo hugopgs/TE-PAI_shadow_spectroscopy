@@ -134,7 +134,9 @@ class TE_PAI:
         with mp.Pool(self.num_processes) as pool:
             self.TE_PAI_Circuits += pool.map(
                 self.gen_quantum_circuit, gates_array, chunksize=chunk_size)
-        print("time to generate quantum circuit :", time.time() - t2)
+
+        print("time to generate Quantum_circuit:", time.time() - t2)
+
         print("Total time:", time.time() - t)
 
     def get_expectation_value(self, observable, multiprocessing=True):

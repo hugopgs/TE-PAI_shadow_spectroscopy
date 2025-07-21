@@ -36,11 +36,14 @@ class Heisenberg_Hamil(Hamiltonian):
     The coefficients are constant in time but structured as functions to remain compatible 
     with the parent Hamiltonian class.
     """
-    def __init__(self, n: int, jx: float, jy: float, jz: float, boundarie_conditions: bool = False, fully_connected : bool =False):
+
+    def __init__(self, n: int, jx: float, jy: float, jz: float, boundarie_conditions: bool = False, fully_connected: bool = False):
+
         self.jx=jx
         self.jy=jy
         self.jz=jz
         self.fully_connected=fully_connected
+        self.boundarie_conditions=boundarie_conditions
         def Jx(t):
             return jx
 
@@ -49,25 +52,31 @@ class Heisenberg_Hamil(Hamiltonian):
 
         def Jz(t):
             return jz
-        if boundarie_conditions:
-            terms = [
-                (gate, [k, (k + 1) % n], Jx if gate ==
-                 "XX" else Jy if gate == "YY" else Jz)
-                for k, gate in product(range(n), ["XX", "YY", "ZZ"])
-            ]
-        else:
-            terms = [
-                (gate, [k, k + 1], Jx if gate ==
-                 "XX" else Jy if gate == "YY" else Jz)
-                for k, gate in product(range(n-1), ["XX", "YY", "ZZ"])
-            ]
         if fully_connected:
-            terms = [
-                (gate, [i, j], Jx if gate == "XX" else Jy if gate == "YY" else Jz)
-                 for (i, j), gate in product(combinations(range(n), 2), ["XX", "YY", "ZZ"])
-                ]    
-            
+                terms=[("XX", [k, j],Jx )for k in range(n) for j in range(k+1, n)]
+                terms += [("YY", [k, j], Jy) for k in range(n) for j in range(k + 1, n)]
+                terms += [("ZZ", [k, j], Jz) for k in range(n) for j in range(k + 1, n)]
+        else:
+
+            if boundarie_conditions:
+                terms = [
+                    (gate, [k, (k + 1) % n], Jx if gate ==
+                    "XX" else Jy if gate == "YY" else Jz)
+                    for k, gate in product(range(n), ["XX", "YY", "ZZ"])
+                ]
+            else:
+                terms = [
+                    (gate, [k, k + 1], Jx if gate ==
+                    "XX" else Jy if gate == "YY" else Jz)
+                    for k, gate in product(range(n-1), ["XX", "YY", "ZZ"])
+                ]
+
         self.name = f"Heisenberg_Jx{jx}_Jy{jy}_Jz{jz}_nq{n}"
+        if fully_connected:
+            self.name += "_fully_connected"
+        elif boundarie_conditions:
+            self.name += "_periodic_boundary_conditions"
+        print(f" instance of Hamiltonian : {self.name} created")
         super().__init__(n, terms)
 
         

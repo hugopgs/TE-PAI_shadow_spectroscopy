@@ -45,8 +45,9 @@ class Hamiltonian:
     
     
     def __post_init__(self):
-        print("The number of qubit:" + str(self.nqubits))
-        print("Number of terms in the Hamiltonian:" + str(len(self.terms)))
+        pass
+        # print("The number of qubit:" + str(self.nqubits))
+        # print("Number of terms in the Hamiltonian:" + str(len(self.terms)))
 
 
     def get_term(self, t)-> list[tuple]:

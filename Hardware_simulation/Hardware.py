@@ -52,6 +52,7 @@ class Hardware:
             self.__initiate_service(self.token, load_account)
         if set_backend:
             self.set_backend(is_fake, name=name_backend)
+            
 
     def __initiate_service(self, token: str = None, save_account: bool = False, path_account: str = None):
         """
@@ -289,15 +290,12 @@ class Hardware:
     def get_data_from_results(self, results):
         bit_string_array = []
         for pub in results:
-            if pub.data.meas.num_shots == 1:
-                bit_string = str(list(pub.data.meas.get_counts().keys())[0])
-            else:
-                counts = pub.data.meas.get_counts()
-                bit_string=max(counts.items(), key=lambda x: x[1])[0]
+            counts = pub.data.meas.get_counts()
+            bit_string=self.most_likely_bitstring(counts)
             bit_string_array.append(bit_string)
         return bit_string_array
 
-    def most_likely_bitstring(counts):
+    def most_likely_bitstring(self, counts):
         return max(counts.items(), key=lambda x: x[1])[0]
 
 
@@ -406,5 +404,24 @@ class Hardware:
     #     return mitigated_counts
 
 
-def most_likely_bitstring(counts):
-    return max(counts.items(), key=lambda x: x[1])[0]
+
+
+    def get_available_backends(
+            self,
+            min_qubits: int = 127,
+            only_operational: bool = True
+        ) -> list[str]:
+        """
+        Finds available IBMQ backends supporting a specific set of basis gates.
+
+        Args:
+            desired_gates (set[str]): Gates required by the user.
+            exact_match (bool): If True, match exact set. If False, match if backend supports all desired gates.
+            min_qubits (int): Minimum number of qubits.
+            only_operational (bool): Return only operational devices.
+
+        Returns:
+            list[str]: List of backend names.
+        """
+        print(self.service.backends(min_num_qubits=min_qubits, operational=only_operational))
+        return self.service.backends()

@@ -12,11 +12,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Third-party imports
 import numpy as np
 from tqdm import tqdm
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import UnitaryGate
 from qiskit_ibm_runtime import SamplerV2 as Sampler, Batch, Options
 import multiprocessing as mp 
 from tools_box.data_file_functions import save_to_file
+import secrets
 
 class ShadowSpectro_Hardware():
     """
@@ -33,7 +34,7 @@ class ShadowSpectro_Hardware():
         shadow_size: Number of classical shadows used at each time step.
         nq: Number of qubits in the system.
     """
-    def __init__(self, hardware, shadow_spectro):
+    def __init__(self, hardware, shadow_spectro, post_process_mode: bool=False):
         """
         Initialize the ShadowSpectro_Hardware class.
         
@@ -41,14 +42,49 @@ class ShadowSpectro_Hardware():
             hardware: A hardware interface class responsible for transpilation and job management.
             shadow_spectro: An instance of a shadow spectroscopy class containing parameters and methods.
         """
-        self.hardware = hardware
+        
+        if post_process_mode:
+            self.hardware = hardware
+            self.backend = hardware.backend
+            
+        else:
+            self.hardware = hardware
+            self.backend = hardware.backend if hasattr(hardware, 'backend') else None
+            self.X = np.array([[0, 1],  [1, 0]])
+            self.Y = np.array([[0, -1j], [1j, 0]])
+            self.Z = np.array([[1, 0],  [0, -1]])
+            self.I = np.array([[1, 0],  [0, 1]])
+            self.S = np.array([[1, 0],  [0, 1j]])
+            self.H = np.array([[1/np.sqrt(2), 1/np.sqrt(2)],
+                            [1/np.sqrt(2), -1/np.sqrt(2)]])
+            self.V = self.H@self.S@self.H@self.S
+            self.W = self.V@self.V
+            self.gate_set = {"X": self.X, "Y": self.Y, "Z": self.Z, "I": self.I, "S": self.S,
+                            "H": self.H, "V": self.V, "W": self.W}
+            self.Clifford_Gate_set = [
+                "III", "XII", "YII", "ZII", "VII", "VXI", "VYI", "VZI",
+                "WXI", "WYI", "WZI", "HXI", "HYI", "HZI", "HII",
+                "HVI", "HVX", "HVY", "HVZ", "HWI", "HWX",
+                "HWY", "HWZ", "WII"]
+            self.precompiled_cliffords = {}
+            for label in self.Clifford_Gate_set:
+                matrix = np.linalg.multi_dot([self.gate_set[gate] for gate in label])
+                unitary = UnitaryGate(matrix, label=label)
+                qc = QuantumCircuit(1)
+                qc.append(unitary, [0])
+                transpiled =  transpile(qc, basis_gates=self.backend.configuration().basis_gates, optimization_level=3)
+                self.precompiled_cliffords[label] = transpiled
+        
+        
         self.shadow_spectro = shadow_spectro
         self.shadow = shadow_spectro.shadow
         self.shadow_size = self.shadow_spectro.shadow_size
         self.nq = self.shadow_spectro.nq
-        self.num_processes = min(30, int(mp.cpu_count() * 0.25))
-        
-        pass
+        self.num_processes = min(40, int(mp.cpu_count() * 0.40))
+        self.chunksize = max(1, self.shadow_size// (self.num_processes * 5))
+        mp.set_start_method("spawn", force=True)
+ 
+       
 
     def get_time_evolve_circuits(self, hamil, init_state: Union[np.ndarray, list, QuantumCircuit] = None, verbose: bool = True,  N_Trotter_steps: int = 1000):
         """
@@ -66,16 +102,19 @@ class ShadowSpectro_Hardware():
                 - List of QuantumCircuits to execute on hardware.
                 - List of corresponding Clifford gates applied at each step.
         """
-        
+        self.init_state=init_state
+        if isinstance(self.init_state, (np.ndarray, list)):
+            init_circ = QuantumCircuit(self.nq)
+            init_circ.initialize(self.init_state, list(range(self.nq)), normalize=True)
+            self._cached_init_circ = transpile(init_circ, optimization_level=3, basis_gates=self.backend.configuration().basis_gates)
+
+        elif isinstance(self.init_state, QuantumCircuit):
+            self._cached_init_circ = transpile( self.init_state.copy(),optimization_level=3, basis_gates=self.backend.configuration().basis_gates)
+
         T = np.linspace(0, self.shadow_spectro.Nt *
                         self.shadow_spectro.dt, self.shadow_spectro.Nt)
         self.file_name = f"Shadow_spectro_nq{self.nq}_Nt{self.shadow_spectro.Nt}_dt{self.shadow_spectro.dt:.2}_NTrot{N_Trotter_steps}_Ns{self.shadow_size}"
         Time_evolve_Clifford_array = []
-        try:
-            if isinstance(hamil(1), UnitaryGate):
-                flag = True
-        except:
-            flag = False
         job_res=[]
         if not self.hardware.is_fake: 
             batch=Batch(backend=self.hardware.backend)
@@ -85,35 +124,39 @@ class ShadowSpectro_Hardware():
             time.sleep(120)
         else: 
             self.sampler = Sampler(self.hardware.backend)
-        
-        for t in tqdm(T, desc="Generate circuit Time evolution", disable=not verbose):
-            Time_evolve_circuit_array=[]
-            if flag:
-                circ = QuantumCircuit(self.nq)
-                if isinstance(init_state, (np.ndarray, list)):
-                    circ.initialize(init_state, normalize=True)
-                circ.append(hamil(t), [n for n in range(self.nq)])
-                circ.copy()
-                if isinstance(init_state, QuantumCircuit):
-                    self.C = init_state.compose(circ, [i for i in range(self.nq)])
-            else:
-                self.C = hamil.gen_quantum_circuit(
-                    t, init_state=init_state,  N_Trotter_steps=N_Trotter_steps)
 
+        for k, t in tqdm(enumerate(T), desc="Generate circuit Time evolution", disable=not verbose):
+            
+            Time_evolve_circuit_array=[]
+            circ = hamil.gen_quantum_circuit(
+                t, init_state=self._cached_init_circ,  N_Trotter_steps=N_Trotter_steps)
+
+            self.C=transpile( circ,optimization_level=3, basis_gates=self.backend.configuration().basis_gates)
             Clifford_Gate_array = []
             with mp.Pool(processes=self.num_processes) as pool :
-                res=pool.map(self.classical_shadow, [i for i in range(self.shadow_size)])
+                res=pool.map(self.classical_shadow, [i for i in range(self.shadow_size)], chunksize=self.chunksize)
             Clifford_Gate_array, Time_evolve_circuit_array=zip(*res)           
-            
             
             Time_evolve_Clifford_array.append(Clifford_Gate_array)
             print("depth circuits : ", Time_evolve_circuit_array[0].depth())
-            N=int(len(Time_evolve_circuit_array)/500)
+            N=int(len(Time_evolve_circuit_array)/250)
             if N==0:
                 N=1
             list_pubs_for_sampling= self.split_list_into_n_sublists(Time_evolve_circuit_array, N)
             
             sub_job=[]
+            if not self.hardware.is_fake and ((k+1)%10==0):
+                # If the backend is QPU, we need to create a new batch every 20 circuits
+                print("batch closing...")
+                time.sleep(120)
+                batch.close()
+                print("Creation of a new batch...")
+                batch=Batch(backend=self.hardware.backend)
+                print(batch.details())
+                self.sampler = Sampler(mode=batch)
+                print("waiting 2 min starting...")
+                time.sleep(120)
+                
             for n, sub_list in enumerate(list_pubs_for_sampling): 
                 job = self.sampler.run(sub_list, shots=1)  
                 print("number of pub:", len(sub_list))
@@ -131,21 +174,6 @@ class ShadowSpectro_Hardware():
             format="pickle",
             Nt= self.shadow_spectro.Nt, dt= self.shadow_spectro.dt, nq=self.nq, Time_evolve_Clifford_array=Time_evolve_Clifford_array,shadow_size=self.shadow_size, job_res=job_res)    
 
-
-    def send_sampler_pub(self, pubs):
-        """
-        Submit circuits to hardware sampler and retrieve or return job ID.
-        Args:
-            pubs: A list of circuits or circuits formatted for submission.
-
-        Returns:
-            List of results if using a fake backend, otherwise a job ID (or list of job IDs).
-        """
-        if self.hardware.Fake_backend:
-            return self.hardware.get_data_from_results(self.hardware.send_sampler_pub(pubs))
-        else:
-            job_id = self.hardware.send_sampler_pub(pubs)
-            return job_id
 
     def deflatten_Time_evolve_bit_string_array(self, flattenTime_evolve_bit_string_array):
         """
@@ -198,10 +226,10 @@ class ShadowSpectro_Hardware():
                 fkt = self.shadow_spectro.expectation_value_q_pauli((Clifford[t], Bit_string_array[t]),multiprocessing=True)
                 D.append(fkt.tolist())
         D = np.array(D)
+        save_to_file("data_matrix_Trotter_kingston_1250", folder_name="data",use_auto_structure=False, D=D)
+        frequencies,solution = self.shadow_spectro.spectro.Spectroscopy(D)
 
-        solution, frequencies = self.shadow_spectro.spectro.Spectroscopy(D)
-
-        return solution, frequencies
+        return  frequencies,solution
 
     def split_list_into_n_sublists(self,lst, n):
         """
@@ -252,7 +280,7 @@ class ShadowSpectro_Hardware():
                     Measurement_bit_string.append(bits)
                     
             save_to_file(
-                self.file_name+"_measurement_bit_string",
+                "measurement_bit_string",
                 folder_name="Hardware_simulation",  # We suppose that the file is run in Frontier_Lab, such as 'python Hardware_simulation/post_process.py'
                 use_auto_structure=False,
                 format="pickle",
@@ -264,7 +292,26 @@ class ShadowSpectro_Hardware():
 
         return Bit_string_array
     
-    def classical_shadow(self, _):
-        clifford_gate, circuit = self.shadow.add_random_clifford(
-                    self.C, copy=True, backend=self.hardware.backend)
-        return clifford_gate, circuit
+
+     
+     
+    def classical_shadow(self,_):
+        circuit_copy = QuantumCircuit(self.nq)
+        circuit_copy.compose(self.C, inplace=True)
+        clifford_labels = []
+        for qubit in range(self.nq):
+            label = self.random_clifford_gate()
+            clifford_circ = self.precompiled_cliffords[label]
+            circuit_copy.compose(clifford_circ, qubits=[qubit], inplace=True)
+            clifford_labels.append(label)
+
+        circuit_copy.measure_all()
+        transpile_circ_for_backend=transpile(circuit_copy, backend=self.backend, optimization_level=1) 
+        return clifford_labels, transpile_circ_for_backend
+        
+        
+    def random_clifford_gate(self, idx: int = None) -> UnitaryGate:
+        """Get a random clifford gate from the Clifford gate set"""
+        if idx is None:
+            return secrets.choice(self.Clifford_Gate_set)
+        return self.Clifford_Gate_set[idx]

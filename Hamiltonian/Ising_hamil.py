@@ -37,23 +37,32 @@ class Ising_Hamil(Hamiltonian):
     nqubits: int
     terms: List[Tuple[str, List[int], Callable[[float], float]]]
 
-    def __init__(self, n, J, transverse: float = None, longitudinal: float = None, fully_connected : bool= False):
-        self.fully_connected=fully_connected
-        if fully_connected:
-            terms = [("ZZ", [k, j], lambda t: -1 * J) for k in range(n) for j in range(k + 1, n)]
-        else : 
-            terms = [("ZZ", [k, (k + 1) % n], lambda t: -1*J)for k in range(n)]
-        self.J = J
-        self.g = 0
-        self.h = 0
-        if isinstance(transverse, (float, int)):
-            self.g = transverse
-            terms += [("X", [k], lambda t: -1*self.g) for k in range(n)]
-        if isinstance(longitudinal, (float, int)):
-            self.h = longitudinal
-            terms += [("Z", [k], lambda t: -1*self.h) for k in range(n)]
-        self.name = f"Ising_J{J}_h{self.h}_g{self.g}_nq{n}"
-        super().__init__(n, terms)
+
+    def __init__(self, n, J, transverse: float = None, longitudinal: float = None, fully_connected : bool= False, bundary_conditions: bool = True):
+            self.fully_connected=fully_connected
+            if fully_connected:
+                terms = [("ZZ", [k, j], lambda t: -1 * J) for k in range(n) for j in range(k + 1, n)]
+            else : 
+                if bundary_conditions:
+                    terms = [("ZZ", [k, (k + 1) % n], lambda t: -1 * J) for k in range(n)]
+                else:
+                    terms = [("ZZ", [k, (k + 1)], lambda t: -1 * J) for k in range(n - 1)]
+            self.J = J
+            self.g = 0
+            self.h = 0
+            if isinstance(transverse, (float, int)):
+                self.g = transverse
+                terms += [("X", [k], lambda t: -1*self.g) for k in range(n)]
+            if isinstance(longitudinal, (float, int)):
+                self.h = longitudinal
+                terms += [("Z", [k], lambda t: -1*self.h) for k in range(n)]
+            self.name = f"Ising_J{J}_h{self.h}_g{self.g}_nq{n}"
+            if fully_connected:
+                self.name += "_fully_connected"
+            elif bundary_conditions:
+                self.name += "_periodic_boundary_conditions"
+            print(f" instance of Hamiltonian : {self.name} created")
+            super().__init__(n, terms)
 
 
 

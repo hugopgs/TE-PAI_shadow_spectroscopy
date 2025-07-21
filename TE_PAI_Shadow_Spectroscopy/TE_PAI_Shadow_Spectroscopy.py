@@ -226,7 +226,7 @@ class TE_PAI_Shadow_Spectroscopy:
             self.C, self.GAMMA = trotter.TE_PAI_Circuits, trotter.GAMMA
             self.TE_PAI_sample=len(self.C)
             self.ms_array = [i for i in range(self.TE_PAI_sample)]
-            self.chunk_size = max(1, self.TE_PAI_sample // int(self.num_processes))
+            self.chunk_size = max(1, self.TE_PAI_sample // (self.num_processes*5))
             D.append(self.loop_time_evolve_te_pai_shadow())
             if isinstance(save_D, int):
                 if (n % save_D == 0 or (n + 1) == self.Nt) and n != 0:
@@ -280,7 +280,7 @@ class TE_PAI_Shadow_Spectroscopy:
             save_D=save_D,
             serialize=serialize,
         )
-        solution, frequencies = self.spectro.Spectroscopy(D, Ljung)
-        return solution, frequencies
+        frequencies, solution = self.spectro.Spectroscopy(D, Ljung)
+        return frequencies,solution
 
    
