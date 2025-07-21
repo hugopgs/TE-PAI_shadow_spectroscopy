@@ -16,7 +16,7 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import UnitaryGate
 from qiskit_ibm_runtime import SamplerV2 as Sampler, Batch, Options
 import multiprocessing as mp 
-from tools_box.data_file_functions import save_to_file
+from tools_box.data_file_functions import get_data_file, save_to_file
 import secrets
 
 class ShadowSpectro_Hardware():
@@ -226,7 +226,7 @@ class ShadowSpectro_Hardware():
                 fkt = self.shadow_spectro.expectation_value_q_pauli((Clifford[t], Bit_string_array[t]),multiprocessing=True)
                 D.append(fkt.tolist())
         D = np.array(D)
-        save_to_file("data_matrix_Trotter_kingston_1250", folder_name="data",use_auto_structure=False, D=D)
+        save_to_file("data_matrix_Trotter_fez_1250", folder_name="data",use_auto_structure=False, D=D)
         frequencies,solution = self.shadow_spectro.spectro.Spectroscopy(D)
 
         return  frequencies,solution

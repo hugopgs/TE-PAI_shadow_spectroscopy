@@ -57,15 +57,16 @@ class TE_PAI_Shadow_Spectro_Hardware:
     def create_gate_function(self, matrix):
         return GateConstructor(matrix)
 
-    def __init__(self, hardware, te_pai_shadow_spectro, post_process_mode=False):
+    def __init__(self, hardware, te_pai_shadow_spectro, post_process_mode=False, num_qubits=None):
         if post_process_mode:
             print("Post processing mode activated, no hardware will be used.")
             self.hardware = hardware
             self.backend = None
+            self.nq = num_qubits
         else:
             self.hardware = hardware
             self.backend = hardware.backend
-        
+            self.nq = te_pai_shadow_spectro.nq
         self.num_processes = min(50, int(mp.cpu_count() * 0.5))
         mp.set_start_method("spawn", force=True)
         self.delta = te_pai_shadow_spectro.delta
@@ -73,7 +74,7 @@ class TE_PAI_Shadow_Spectro_Hardware:
         self.shadow_spectro = te_pai_shadow_spectro.Shadow_Spectro
         self.shadow = te_pai_shadow_spectro.classical_shadow
         self.shadow_size = te_pai_shadow_spectro.shadow_size
-        self.nq = te_pai_shadow_spectro.nq
+        
         self.Nt = self.te_pai_shadow_spectro.Nt
         self.dt = self.te_pai_shadow_spectro.dt
         self.trotter_steps = te_pai_shadow_spectro.trotter_steps

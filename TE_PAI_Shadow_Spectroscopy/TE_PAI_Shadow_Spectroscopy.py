@@ -43,7 +43,7 @@ class TE_PAI_Shadow_Spectroscopy:
    
     def __init__(self, hamil, delta: float, dt: float, Nt, shadow_size: int,
                  trotter_steps:float=1.e-4, PAI_error:float=0.1, N_trotter_max : int =8000,M_sample_max: int =1000,
-                 init_state: QuantumCircuit = None, K: int = 3, noise_coef:list[float,float] =None):
+                 init_state: QuantumCircuit = None, K: int = 3, noise_coef:list[float,float] =None, num_qubits: int = None):
         """Class constructor of TE_PAI_Shadow_Spectroscopy.
 
         Parameters
@@ -79,7 +79,10 @@ class TE_PAI_Shadow_Spectroscopy:
         self.Nt = Nt
         self.shadow_size = shadow_size
         self.hamil = hamil
-        self.nq = hamil.nqubits
+        if num_qubits is not None:
+            self.nq = num_qubits
+        else:
+            self.nq = hamil.num_qubits
         self.classical_shadow = ClassicalShadow(noise_error=noise_coef)
         self.spectro = Spectroscopy(Nt, dt)
         self.Shadow_Spectro = ShadowSpectro(

@@ -97,7 +97,7 @@ class fast_TE_PAI_shadow:
         if self.M_sample < 60:
             self.M_sample = 60
             
-        self.num_processes = min(30, int(mp.cpu_count() * 0.20))
+        self.num_processes = min(30, int(mp.cpu_count() * 0.30))
         self.backend=backend
         print("overhead:", self.overhead)
         print("M_sample:", self.M_sample)
